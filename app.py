@@ -9,11 +9,57 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk import pos_tag
 import pandas as pd
+import json
+import os
+from datetime import datetime
 
 # Download NLTK resources
 nltk.download("punkt_tab", quiet=True)
 nltk.download("stopwords", quiet=True)
 nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+
+# Persistent user database file
+USER_DB_FILE = "users_db.json"
+
+def load_users_db():
+    """Load user database from JSON file."""
+    if os.path.exists(USER_DB_FILE):
+        try:
+            with open(USER_DB_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {
+                'admin': 'Resume@123',
+                'resumeuser': 'securepass123'
+            }
+    return {
+        'admin': 'Resume@123',
+        'resumeuser': 'securepass123'
+    }
+
+def save_users_db(user_db):
+    """Save user database to JSON file."""
+    try:
+        with open(USER_DB_FILE, 'w') as f:
+            json.dump(user_db, f)
+    except Exception as e:
+        print(f"Error saving user database: {e}")
+
+def signup_with_gmail(gmail_address):
+    """Register or login user with Gmail address."""
+    if not gmail_address or '@gmail.com' not in gmail_address.lower():
+        return False, 'Please enter a valid Gmail address.'
+    
+    gmail_username = gmail_address.split('@')[0]
+    
+    if gmail_username in st.session_state.user_db:
+        # User already exists, auto-login
+        return True, f'Welcome back, {gmail_username}!'
+    
+    # Create new account with Gmail
+    st.session_state.user_db[gmail_username] = f"gmail_{gmail_address}"
+    save_users_db(st.session_state.user_db)
+    return True, f'Account created with Gmail: {gmail_address}'
 
 # Page Setup
 st.set_page_config(page_title="Resume Job Match Scorer", page_icon="📄", layout="wide")
@@ -40,10 +86,7 @@ if 'authenticated' not in st.session_state:
 if 'login_status' not in st.session_state:
     st.session_state.login_status = ''
 if 'user_db' not in st.session_state:
-    st.session_state.user_db = {
-        'admin': 'Resume@123',
-        'resumeuser': 'securepass123'
-    }
+    st.session_state.user_db = load_users_db()
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
@@ -205,6 +248,7 @@ def add_new_user(username, password):
     if len(password) < 6:
         return False, 'Password should be at least 6 characters long.'
     st.session_state.user_db[username] = password
+    save_users_db(st.session_state.user_db)
     return True, 'Account created successfully. Please login with your new credentials.'
 
 
@@ -702,6 +746,19 @@ def main():
             login_tab, signup_tab = st.tabs(["Login", "Sign Up"])
 
             with login_tab:
+                st.markdown("### 📧 Login with Gmail")
+                gmail_login = st.text_input("Enter your Gmail address", placeholder="your.email@gmail.com", key="gmail_login")
+                if st.button("📨 Continue with Gmail", key="gmail_login_btn"):
+                    success, message = signup_with_gmail(gmail_login)
+                    if success:
+                        st.session_state.authenticated = True
+                        st.session_state.current_user = gmail_login.split('@')[0]
+                        st.success(f"✅ {message}")
+                    else:
+                        st.error(f"❌ {message}")
+                
+                st.markdown("---")
+                st.markdown("### 🔐 Or Login with Username")
                 username = st.text_input("Username", key="login_user")
                 password = st.text_input("Password", type="password", key="login_pass")
                 if st.button("Login", key="login_btn"):
@@ -713,6 +770,19 @@ def main():
                         st.error("❌ Invalid credentials. Please try again.")
 
             with signup_tab:
+                st.markdown("### 📧 Sign Up with Gmail")
+                new_gmail = st.text_input("Enter your Gmail address", placeholder="your.email@gmail.com", key="signup_gmail")
+                if st.button("📨 Sign Up with Gmail", key="signup_gmail_btn"):
+                    success, message = signup_with_gmail(new_gmail)
+                    if success:
+                        st.session_state.authenticated = True
+                        st.session_state.current_user = new_gmail.split('@')[0]
+                        st.success(f"✅ {message} You can now view the full report.")
+                    else:
+                        st.error(f"❌ {message}")
+                
+                st.markdown("---")
+                st.markdown("### 🔐 Or Sign Up with Username")
                 new_user = st.text_input("Choose a username", key="signup_user")
                 new_pass = st.text_input("Choose a password", type="password", key="signup_pass")
                 confirm_pass = st.text_input("Confirm password", type="password", key="signup_confirm")
