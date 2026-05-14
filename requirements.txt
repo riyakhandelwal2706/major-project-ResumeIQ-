@@ -5,3 +5,4 @@ nltk
 pandas
 matplotlib
 numpy
+opencv-python-headless
